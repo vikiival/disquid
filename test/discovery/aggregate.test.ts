@@ -67,12 +67,12 @@ describe('aggregate', () => {
     })
 
     it('ignores logs that no decoder owns and does not register their tokens', () => {
-        const nft = {
+        const unowned = {
             address: T1,
-            topics: [TRANSFER_TOPIC, word(A), word(B), word('0x5')],
+            topics: ['0x' + '9'.repeat(64), word(A), word(B)],
             data: '0x',
         }
-        const fold = aggregate([{header: {number: 1}, logs: [nft]}])
+        const fold = aggregate([{header: {number: 1}, logs: [unowned]}])
         expect(fold.pending.size).toBe(0)
         expect(fold.tokens.size).toBe(0)
     })

@@ -1,13 +1,14 @@
 import {TokenStandard} from '../model'
 import {erc20} from './erc20'
+import {erc721} from './erc721'
 import type {Interaction, RawLog, StandardDecoder} from './types'
 
 export * from './types'
 export {erc20, TRANSFER_TOPIC} from './erc20'
+export {erc721} from './erc721'
 
-// ERC-721 / ERC-1155 modules get added here later.
 export function enabledDecoders(): StandardDecoder[] {
-    return [erc20]
+    return [erc20, erc721]
 }
 
 export function topic0Union(decoders: StandardDecoder[] = enabledDecoders()): string[] {

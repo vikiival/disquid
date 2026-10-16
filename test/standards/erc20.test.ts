@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest'
 
 import {TokenStandard} from '../../src/model'
-import {accountTokenId, decodeLog, enabledDecoders, standardCode, topic0Union, TRANSFER_TOPIC} from '../../src/standards'
+import {accountTokenId, decodeLog, enabledDecoders, erc20, standardCode, topic0Union, TRANSFER_TOPIC} from '../../src/standards'
 import type {StandardDecoder} from '../../src/standards'
 
 
@@ -38,8 +38,8 @@ describe('erc20 decoder', () => {
 
     it('rejects ERC-721 shaped Transfer (4 topics, empty data)', () => {
         const tokenId = '0x' + '0'.repeat(63) + '5'
-        expect(decodeLog(log([TRANSFER_TOPIC, word(A), word(B), tokenId], '0x'), 1)).toEqual([])
-        expect(decodeLog(log([TRANSFER_TOPIC, word(A), word(B), tokenId]), 1)).toEqual([])
+        expect(erc20.decode(log([TRANSFER_TOPIC, word(A), word(B), tokenId], '0x'), 1)).toEqual([])
+        expect(erc20.decode(log([TRANSFER_TOPIC, word(A), word(B), tokenId]), 1)).toEqual([])
     })
 
     it('rejects bad data lengths', () => {
@@ -64,26 +64,16 @@ describe('erc20 decoder', () => {
 })
 
 describe('registry', () => {
-    it('exposes ERC-20 only for now', () => {
-        expect(enabledDecoders().map(d => d.standard)).toEqual([TokenStandard.ERC20])
+    it('exposes ERC-20 and ERC-721, sharing one topic0', () => {
+        expect(enabledDecoders().map(d => d.standard)).toEqual([TokenStandard.ERC20, TokenStandard.ERC721])
         expect(topic0Union()).toEqual([TRANSFER_TOPIC])
     })
 
-    it('dispatches to every decoder sharing a topic0 and dedupes the union', () => {
-        const nft: StandardDecoder = {
-            standard: TokenStandard.ERC721,
-            topic0: [TRANSFER_TOPIC],
-            decode: (l, block) =>
-                l.topics.length === 4
-                    ? [{account: 'x', token: l.address, standard: TokenStandard.ERC721, direction: 'in', block}]
-                    : [],
-        }
-        const decoders = [...enabledDecoders(), nft]
-        expect(topic0Union(decoders)).toEqual([TRANSFER_TOPIC])
+    it('dispatches to the decoder owning each Transfer layout', () => {
         const erc20Log = log([TRANSFER_TOPIC, word(A), word(B)])
         const nftLog = log([TRANSFER_TOPIC, word(A), word(B), word('0x5')], '0x')
-        expect(decodeLog(erc20Log, 1, decoders).map(i => i.standard)).toEqual([TokenStandard.ERC20, TokenStandard.ERC20])
-        expect(decodeLog(nftLog, 1, decoders).map(i => i.standard)).toEqual([TokenStandard.ERC721])
+        expect(decodeLog(erc20Log, 1).map(i => i.standard)).toEqual([TokenStandard.ERC20, TokenStandard.ERC20])
+        expect(decodeLog(nftLog, 1).map(i => i.standard)).toEqual([TokenStandard.ERC721, TokenStandard.ERC721])
     })
 
     it('builds ids with the standard code', () => {

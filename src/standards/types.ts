@@ -8,7 +8,18 @@ export interface Interaction {
     standard: TokenStandard
     direction: Direction
     block: number
-    // reserved for NFTs: tokenId?: bigint; amount?: bigint
+    // ERC-721 only: the token id moved by the Transfer.
+    tokenId?: bigint
+}
+
+export const WORD_RE = /^0x[0-9a-fA-F]{64}$/
+
+export function topicAddress(topic: string | undefined): string | undefined {
+    // An indexed address is a 32-byte word with 12 zero bytes in front. Anything else is not an
+    // address (some non-standard contracts reuse the Transfer topic with other layouts).
+    if (topic == null || !WORD_RE.test(topic)) return undefined
+    if (!topic.startsWith('0x' + '0'.repeat(24))) return undefined
+    return '0x' + topic.slice(26).toLowerCase()
 }
 
 export interface RawLog {
