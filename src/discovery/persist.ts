@@ -1,7 +1,7 @@
 import {In, LessThan} from 'typeorm'
 
 import type {MetadataResult} from '../metadata'
-import {AccountToken, Block, Token, TokenMetadataStatus} from '../model'
+import {AccountToken, Block, NftItem, Token, TokenMetadataStatus} from '../model'
 import type {Fold} from './aggregate'
 
 // The slice of the typeorm-store Store that discovery needs. Keeping it narrow lets tests use an
@@ -129,6 +129,26 @@ export async function persistAccountTokens(store: DiscoveryStore, fold: Fold): P
     return rows.length
 }
 
+// One full upsert per move, no read needed: NftItem is pure last-wins state, the fold
+// already resolved which move is current for every (contract, tokenId) in the batch.
+// Upserting an unchanged row is a no-op, so reorg/hot-block handling stays trivial.
+export async function persistNftItems(store: DiscoveryStore, fold: Fold): Promise<number> {
+    if (fold.nft.size === 0) return 0
+    await store.upsert(
+        [...fold.nft.values()].map(
+            move =>
+                new NftItem({
+                    id: `${move.contract}:${move.tokenId}`,
+                    contract: new Token({id: move.contract}),
+                    tokenId: move.tokenId,
+                    owner: move.owner,
+                    lastTransferBlock: move.block,
+                }),
+        ),
+    )
+    return fold.nft.size
+}
+
 export async function persistBlocks(store: DiscoveryStore, headers: BlockHeaderLike[]): Promise<void> {
     if (headers.length === 0) return
     await store.upsert(
@@ -173,6 +193,7 @@ export function blockRetention(env: NodeJS.ProcessEnv = process.env): number {
 
 export interface PersistSummary extends TokenSummary {
     accountTokens: number
+    nftItems: number
     pruned: number
 }
 
@@ -185,10 +206,11 @@ export async function persistBatch(
 ): Promise<PersistSummary> {
     const tokens = await persistTokens(store, fold.tokens, metadata)
     const accountTokens = await persistAccountTokens(store, fold)
+    const nftItems = await persistNftItems(store, fold)
     await persistBlocks(store, headers)
     let pruned = 0
     if (headers.length > 0) {
         pruned = await pruneBlocks(store, headers[0].number, headers[headers.length - 1].number, retention)
     }
-    return {...tokens, accountTokens, pruned}
+    return {...tokens, accountTokens, nftItems, pruned}
 }

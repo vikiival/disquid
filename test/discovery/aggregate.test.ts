@@ -18,7 +18,15 @@ const transfer = (token: string, from: string, to: string) => ({
     topics: [TRANSFER_TOPIC, word(from), word(to)],
     data: DATA,
 })
-const block = (number: number, logs: ReturnType<typeof transfer>[] = []) => ({header: {number}, logs})
+const erc721Transfer = (token: string, from: string, to: string, tokenId: bigint) => ({
+    address: token,
+    topics: [TRANSFER_TOPIC, word(from), word(to), '0x' + tokenId.toString(16).padStart(64, '0')],
+    data: '0x',
+})
+const block = (number: number, logs: (ReturnType<typeof transfer> | ReturnType<typeof erc721Transfer>)[] = []) => ({
+    header: {number},
+    logs,
+})
 
 describe('aggregate', () => {
     it('folds logs across blocks into one row per account/token/standard', () => {
@@ -81,5 +89,36 @@ describe('aggregate', () => {
         const fold = aggregate([block(20, [transfer(T1, A, B)]), block(15, [transfer(T1, A, B)])])
         expect(fold.pending.get(`${A}:${T1}:20`)).toMatchObject({firstSeenBlock: 15, lastSeenBlock: 20})
         expect(fold.tokens.get(T1)).toBe(15)
+    })
+})
+
+describe('nft fold', () => {
+    it('records the receiver of the last transfer as the owner', () => {
+        const fold = aggregate([block(7, [erc721Transfer(T1, A, B, 5n)])])
+        expect(fold.nft.get(`${T1}:5`)).toEqual({contract: T1, tokenId: 5n, owner: B, block: 7})
+    })
+
+    it('keeps only the last move when a token id moves several times in one batch', () => {
+        const fold = aggregate([block(7, [erc721Transfer(T1, A, B, 5n)]), block(8, [erc721Transfer(T1, B, A, 5n)])])
+        expect(fold.nft.size).toBe(1)
+        expect(fold.nft.get(`${T1}:5`)).toMatchObject({owner: A, block: 8})
+    })
+
+    it('mints record the minter and burns reset the owner to the zero address', () => {
+        const fold = aggregate([block(7, [erc721Transfer(T1, ZERO, B, 5n), erc721Transfer(T1, B, ZERO, 6n)])])
+        expect(fold.nft.get(`${T1}:5`)).toMatchObject({owner: B, block: 7})
+        expect(fold.nft.get(`${T1}:6`)).toMatchObject({owner: ZERO, block: 7})
+    })
+
+    it('still folds ERC-721 transfers into AccountToken rows', () => {
+        const fold = aggregate([block(7, [erc721Transfer(T1, A, B, 5n)])])
+        expect(fold.pending.get(`${A}:${T1}:721`)).toMatchObject({sentCount: 1})
+        expect(fold.pending.get(`${B}:${T1}:721`)).toMatchObject({receivedCount: 1})
+        expect(fold.tokens.get(T1)).toBe(7)
+    })
+
+    it('ERC-20 transfers produce no nft moves', () => {
+        const fold = aggregate([block(7, [transfer(T1, A, B)])])
+        expect(fold.nft.size).toBe(0)
     })
 })

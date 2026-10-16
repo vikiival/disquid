@@ -24,6 +24,7 @@ run(source, new TypeormDatabase({supportHotBlocks: true}), async (ctx) => {
         blocks: headers.length,
         isHead: ctx.isHead,
         accountTokens: summary.accountTokens,
+        nftItems: summary.nftItems,
         newTokens: summary.newTokens,
         metadataFetched: summary.metadataFetched,
         metadataPending: summary.metadataPending,

@@ -62,7 +62,7 @@ afterAll(async () => {
 })
 
 async function reset() {
-    await db.query('TRUNCATE account_token, token, block')
+    await db.query('TRUNCATE nft_item, account_token, token, block CASCADE')
 }
 
 async function addBlock(n: number, blockHash = hash(n)) {
@@ -72,7 +72,7 @@ async function addBlock(n: number, blockHash = hash(n)) {
 }
 
 async function addToken(token: string, symbol: string | null = null, decimals: number | null = null) {
-    await db.query('INSERT INTO token (id, first_seen_block, symbol, decimals) VALUES ($1, 1, $2, $3) ON CONFLICT DO NOTHING', [token, symbol, decimals])
+    await db.query("INSERT INTO token (id, first_seen_block, symbol, decimals, metadata_status) VALUES ($1, 1, $2, $3, 'PENDING') ON CONFLICT DO NOTHING", [token, symbol, decimals])
 }
 
 async function addRow(account: string, token: string, lastSeenBlock: number, standard = TokenStandard.ERC20) {

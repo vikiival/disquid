@@ -12,7 +12,7 @@ import {
     shouldPrune,
 } from '../../src/discovery'
 import {MetadataLoader} from '../../src/metadata'
-import {AccountToken, Block, Token, TokenMetadataStatus, TokenStandard} from '../../src/model'
+import {AccountToken, Block, NftItem, Token, TokenMetadataStatus, TokenStandard} from '../../src/model'
 import {TRANSFER_TOPIC} from '../../src/standards'
 import {abiString, decimalsWord, downError, FakeMetadataNode} from '../metadata/fake-node'
 import {FakeStore} from './fake-store'
@@ -28,6 +28,11 @@ const transfer = (token: string, from: string, to: string) => ({
     address: token,
     topics: [TRANSFER_TOPIC, word(from), word(to)],
     data: DATA,
+})
+const erc721Transfer = (token: string, from: string, to: string, tokenId: bigint) => ({
+    address: token,
+    topics: [TRANSFER_TOPIC, word(from), word(to), '0x' + tokenId.toString(16).padStart(64, '0')],
+    data: '0x',
 })
 // Answers every token like an EOA: FETCHED with null fields.
 const metadata = () =>
@@ -156,11 +161,25 @@ describe('persistBatch', () => {
             {header: header(1001), logs: []},
         ]
         const summary = await persistBatch(store, aggregate(blocks), blocks.map(b => b.header), 50_000, metadata())
-        expect(summary).toEqual({newTokens: 1, metadataFetched: 1, metadataPending: 0, accountTokens: 2, pruned: 0})
+        expect(summary).toEqual({newTokens: 1, metadataFetched: 1, metadataPending: 0, accountTokens: 2, nftItems: 0, pruned: 0})
         expect(store.table(Block).size).toBe(2)
         // FK order: token rows land before account-token rows.
         const order = store.calls.filter(c => !c.method.startsWith('find')).map(c => c.entity)
         expect(order).toEqual(['Token', 'AccountToken', 'Block'])
+    })
+
+    it('writes nft items after their token row', async () => {
+        const store = new FakeStore()
+        const blocks = [{header: header(1002), logs: [erc721Transfer(T1, A, B, 5n)]}]
+        const summary = await persistBatch(store, aggregate(blocks), blocks.map(b => b.header), 50_000, metadata())
+        expect(summary).toMatchObject({newTokens: 1, accountTokens: 2, nftItems: 1})
+        // The NftItem's token FK must reference an existing Token row.
+        expect(store.table(Token).get(T1)).toMatchObject({firstSeenBlock: 1002})
+        expect(store.table(NftItem).get(`${T1}:5`)).toEqual(
+            expect.objectContaining({tokenId: 5n, owner: B, lastTransferBlock: 1002}),
+        )
+        const order = store.calls.filter(c => !c.method.startsWith('find')).map(c => c.entity)
+        expect(order).toEqual(['Token', 'AccountToken', 'NftItem', 'Block'])
     })
 })
 

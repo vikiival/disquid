@@ -4,7 +4,7 @@ import {erc721} from './erc721'
 import type {Interaction, RawLog, StandardDecoder} from './types'
 
 export * from './types'
-export {erc20, TRANSFER_TOPIC} from './erc20'
+export {erc20, TRANSFER_TOPIC, ZERO_ADDRESS} from './erc20'
 export {erc721} from './erc721'
 
 export function enabledDecoders(): StandardDecoder[] {
