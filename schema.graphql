@@ -1,0 +1,72 @@
+# Token discovery index for ONE network (one squid / one database schema per
+# network). Addresses and hashes are lowercase 0x-hex strings.
+#
+# This is a discovery index, not a transfer history: each (account, token,
+# standard) interaction is folded into a single AccountToken row. Balances are
+# never derived from events (the index starts mid-chain); they are read on
+# demand by the API with Multicall3 at the served block.
+
+enum TokenStandard {
+    ERC20
+    ERC721
+    ERC1155
+}
+
+enum TokenMetadataStatus {
+    # Not fetched yet, or the last fetch hit an RPC failure: retried later.
+    PENDING
+    # Fetched; each of name/symbol/decimals is set when the contract answered it.
+    FETCHED
+}
+
+# A contract seen emitting a recognised token event. id = contract address.
+# One contract can appear under several standards (e.g. ERC-404 emits both
+# ERC-20 and ERC-721 shaped Transfers); the standard lives on AccountToken.
+# Metadata is read once (name/symbol/decimals via Multicall3) and is nullable:
+# discovery never depends on it.
+type Token @entity {
+    id: ID!
+    firstSeenBlock: Int!
+    name: String
+    symbol: String
+    decimals: Int
+    metadataStatus: TokenMetadataStatus! @index
+    accounts: [AccountToken!]! @derivedFrom(field: "token")
+}
+
+# "account has interacted with token under standard" (sent or received at
+# least once since the start block). Not evidence of a positive balance.
+# id = `${account}:${token}:${standardCode}`, standardCode in 20 | 721 | 1155.
+# The unique index serves the main query: WHERE account = ? AND standard = ?
+# ORDER BY token, with keyset pagination on token.
+type AccountToken @entity @index(fields: ["account", "standard", "token"], unique: true) {
+    id: ID!
+    account: String!
+    token: Token!
+    standard: TokenStandard!
+    firstSeenBlock: Int!
+    # Highest block with an interaction; the API uses it to decide whether a
+    # cached balance read at block R can still be served (no activity after R).
+    lastSeenBlock: Int!
+    sentCount: Int!
+    receivedCount: Int!
+}
+
+# Recent canonical headers written by the processor, including blocks with no
+# token events. Rolled back with the hot-block change log on reorgs, so it is
+# the API's source of truth for "is block R (hash H) still canonical" and for
+# the served block's hash/timestamp. Pruned to a retention window.
+# id = block number zero-padded to 10 digits.
+type Block @entity {
+    id: ID!
+    number: Int! @index(unique: true)
+    hash: String!
+    timestamp: DateTime!
+}
+
+# Reserved for ERC-721 / ERC-1155 (not populated yet), additive, no change to
+# the rows above:
+#   NftItem { id: `${contract}:${tokenId}`, contract: Token!, tokenId: BigInt!,
+#             owner: String! @index, lastTransferBlock: Int! }   # ERC-721: last `to` wins
+#   AccountNftItem { id, account: String!, contract: Token!, tokenId: BigInt!,
+#             lastSeenBlock: Int! }   # ERC-1155: ids seen per account; balances via balanceOfBatch
