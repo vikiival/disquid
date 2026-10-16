@@ -64,9 +64,20 @@ type Block @entity {
     timestamp: DateTime!
 }
 
-# Reserved for ERC-721 / ERC-1155 (not populated yet), additive, no change to
-# the rows above:
-#   NftItem { id: `${contract}:${tokenId}`, contract: Token!, tokenId: BigInt!,
-#             owner: String! @index, lastTransferBlock: Int! }   # ERC-721: last `to` wins
-#   AccountNftItem { id, account: String!, contract: Token!, tokenId: BigInt!,
-#             lastSeenBlock: Int! }   # ERC-1155: ids seen per account; balances via balanceOfBatch
+# Per-token ownership for ERC-721 (the bonus endpoint's storage). One row per
+# token id moved since the start block; the owner is the `to` address of the
+# last Transfer ("last to wins"). A mint (from = zero address) creates the
+# row, a burn (to = zero address) sets the owner back to the zero address,
+# matching ownerOf() on chain. Lazy-minted ids that never emitted a Transfer
+# do not exist here: discovery only knows what events show. No history row,
+# no approvals. ERC-1155 remains modeled as AccountToken interactions only.
+# stick/kodadot precedent: same carry-transfers-to-owner fold; they store an
+# explicit burned flag, we keep ownerOf() parity instead. No extra column.
+# id = `${contract}:${tokenId}` with tokenId in decimal.
+type NftItem @entity @index(fields: ["contract", "tokenId"], unique: true) @index(fields: ["owner"]) {
+    id: ID!
+    contract: Token!
+    tokenId: BigInt!
+    owner: String!
+    lastTransferBlock: Int!
+}
