@@ -1,0 +1,7 @@
+allowBuilds:
+  '@apollo/protobufjs': true
+  bufferutil: true
+  es5-ext: true
+  secp256k1: true
+  type-graphql: false
+  utf-8-validate: true

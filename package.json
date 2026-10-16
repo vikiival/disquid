@@ -1,0 +1,45 @@
+{
+  "name": "squid",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "rm -rf lib && tsc",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "update": "npx npm-check-updates --filter /subsquid/ --upgrade && npm i -f"
+  },
+  "dependencies": {
+    "@subsquid/batch-processor": "^1.1.0",
+    "@subsquid/evm-abi": "^1.0.0",
+    "@subsquid/evm-codec": "^1.0.0",
+    "@subsquid/evm-normalization": "^0.1.0",
+    "@subsquid/evm-objects": "^0.0.3",
+    "@subsquid/evm-rpc": "^0.2.0",
+    "@subsquid/evm-stream": "^0.1.5",
+    "@subsquid/graphql-server": "^4.12.1",
+    "@subsquid/http-client": "^1.9.0",
+    "@subsquid/logger": "^1.6.0",
+    "@subsquid/rpc-client": "^4.16.1",
+    "@subsquid/squid-sdk": "^0.6.2",
+    "@subsquid/typeorm-migration": "^1.4.0",
+    "@subsquid/typeorm-store": "^1.9.2",
+    "@subsquid/util-internal": "^3.3.1",
+    "@subsquid/util-internal-data-source": "^0.0.0",
+    "@subsquid/util-internal-range": "^0.3.0",
+    "class-validator": "^0.14.4",
+    "dotenv": "^18.0.8",
+    "pg": "^8.23.1",
+    "reflect-metadata": "0.2.2",
+    "type-graphql": "1.2.0-rc.1",
+    "typeorm": "^0.3.31"
+  },
+  "devDependencies": {
+    "@subsquid/evm-typegen": "^5.0.0",
+    "@subsquid/typeorm-codegen": "^2.4.0",
+    "@swc/core": "^1.16.18",
+    "@types/node": "^26.6.5",
+    "typescript": "~6.0.2",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^3.2.7"
+  }
+}

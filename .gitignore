@@ -1,0 +1,10 @@
+/node_modules
+/lib
+package-lock.json
+
+# IDE files
+/.idea
+**/*.log
+
+# Local secrets (RPC_URL)
+.env

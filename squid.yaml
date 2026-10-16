@@ -1,0 +1,14 @@
+manifestVersion: subsquid.io/v0.1
+name: rpc-token-discovery
+version: 1
+description: 'Ethereum ERC-20 discovery through JSON-RPC'
+build: 
+deploy:
+  secrets:
+    - RPC_URL
+  addons:
+    postgres: 
+  processor:
+    cmd: [ "sqd", "process:prod" ]
+  api:
+    cmd: [ "sqd", "serve:prod" ]
