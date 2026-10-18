@@ -36,6 +36,10 @@ describe('erc20 decoder', () => {
         expect(decodeLog(log([TRANSFER_TOPIC, word(ZERO), word(ZERO)]), 1)).toEqual([])
     })
 
+    it('skips zero-value transfers', () => {
+        expect(decodeLog(log([TRANSFER_TOPIC, word(A), word(B)], '0x' + '0'.repeat(64)), 1)).toEqual([])
+    })
+
     it('rejects ERC-721 shaped Transfer (4 topics, empty data)', () => {
         const tokenId = '0x' + '0'.repeat(63) + '5'
         expect(erc20.decode(log([TRANSFER_TOPIC, word(A), word(B), tokenId], '0x'), 1)).toEqual([])

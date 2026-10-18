@@ -6,6 +6,7 @@ export const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11
 
 export const ZERO_ADDRESS = '0x' + '0'.repeat(40)
 const DATA_RE = /^0x[0-9a-fA-F]{64}$/
+const ZERO_AMOUNT = '0x' + '0'.repeat(64)
 
 export const erc20: StandardDecoder = {
     standard: TokenStandard.ERC20,
@@ -14,6 +15,8 @@ export const erc20: StandardDecoder = {
         // ERC-721 shares this topic0 but indexes tokenId (4 topics, empty data).
         if (log.topics.length !== 3 || log.topics[0].toLowerCase() !== TRANSFER_TOPIC) return []
         if (!DATA_RE.test(log.data)) return []
+        // A zero-value Transfer moves no balance and is the main address-poisoning spam vector.
+        if (log.data === ZERO_AMOUNT) return []
         const from = topicAddress(log.topics[1])
         const to = topicAddress(log.topics[2])
         if (from == null || to == null) return []
