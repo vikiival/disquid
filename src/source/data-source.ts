@@ -3,6 +3,7 @@ import type {FieldSelection} from '@subsquid/evm-stream'
 import {EvmRpcStreamDataSource, type EvmRpcStreamOptions} from '@subsquid/squid-sdk/evm/rpc'
 import assert from 'assert'
 
+import {LogsCatchupDataSource, type LogsCatchupOptions} from './catchup'
 import {ForkSafeDataSource, ForkWalkOptions} from './fork'
 import {RpcCallMeter} from './metrics'
 import {PushdownRpc} from './pushdown-rpc'
@@ -13,6 +14,8 @@ export interface DiscoveryRpcStreamOptions<F extends FieldSelection> extends Evm
     headerOnly: boolean
     headPollInterval: number
     fork?: ForkWalkOptions
+    /** Serve finalized gaps from `eth_getLogs` alone, without per-block headers. */
+    catchup?: LogsCatchupOptions
     meter: RpcCallMeter
 }
 
@@ -38,6 +41,7 @@ export class DiscoveryRpcStreamDataSource<F extends FieldSelection> extends EvmR
             strideConcurrency: options.strideConcurrency,
             headPollInterval: options.headPollInterval,
         })
-        ;(this as any).inner = new ForkSafeDataSource(inner, options.rpc, options.fork)
+        let source = options.catchup ? new LogsCatchupDataSource(inner, options.rpc, options.catchup) : inner
+        ;(this as any).inner = new ForkSafeDataSource(source, options.rpc, options.fork)
     }
 }

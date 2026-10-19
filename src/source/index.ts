@@ -1,4 +1,5 @@
 export {DiscoveryRpcSourceBuilder, type DiscoveryRpcOptions} from './builder'
+export {LogsCatchupDataSource, type LogsCatchupOptions} from './catchup'
 export {DiscoveryRpcStreamDataSource, type DiscoveryRpcStreamOptions} from './data-source'
 export {ForkSafeDataSource, type ForkWalkOptions} from './fork'
 export {RpcCallMeter, type RpcCallCounts} from './metrics'

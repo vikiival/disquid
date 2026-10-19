@@ -46,6 +46,12 @@ export interface DiscoveryRpcOptions extends EvmRpcOptions {
     logsPushdown?: boolean
     /** Max blocks per `eth_getLogs` call (default: one stride). */
     maxLogsRange?: number
+    /**
+     * Serve blocks below the finalized head from filtered `eth_getLogs` alone, reading a header
+     * only where the logs cannot stand in for it (default true with logs pushdown). Ranges are
+     * `maxLogsRange` blocks, batches `strideSize`.
+     */
+    logsCatchup?: boolean
     /** Reuse of the `finalized` head in ms (default 60 000). */
     finalizedHeadTtl?: number
     /** Re-fetch blocks whose filtered logs are empty while the header bloom admits a match (default true). */
@@ -130,6 +136,14 @@ export class DiscoveryRpcSourceBuilder<F extends FieldSelection = {}> extends Ev
             headerOnly,
             headPollInterval: o.headPollInterval ?? (slotTime > 0 ? 2_000 : 3_000),
             fork: o.fork,
+            catchup:
+                headerOnly && (o.logsCatchup ?? true)
+                    ? {
+                          range: o.maxLogsRange ?? o.strideSize ?? 5,
+                          batchSize: o.strideSize ?? 5,
+                          concurrency: Math.max(1, o.strideConcurrency ?? 5),
+                      }
+                    : undefined,
             meter,
         })
     }

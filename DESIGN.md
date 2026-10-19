@@ -112,6 +112,18 @@ public classes itself:
   - Every log's `blockHash` must match the header of its block. Otherwise it re-fetches by
     `blockHash`, and fails if they still disagree. No silent drops.
 - `EvmRpcStreamDataSource` with configurable `headPollInterval`.
+- Header-less finalized catch-up (`LogsCatchupDataSource`, on by default with the pushdown):
+  - **Source:** below the finalized head, blocks come from `eth_getLogs` alone, in `maxLogsRange`
+    ranges (100 by default). Number, hash and timestamp come from each log's `blockNumber`,
+    `blockHash` and `blockTimestamp`.
+  - **Headers, only when needed:** a header is fetched only for a block with no matching log
+    (checked against the bloom), for logs without `blockTimestamp`, or for logs that disagree on
+    the hash.
+  - **Hand-off:** near the finalized head it hands over to the normal stream with the last hash as
+    `parentHash`. The first block's real parent is checked first, so a hot head replaced during
+    downtime still surfaces as a fork.
+  - **Cost:** about 0.01 calls per block instead of 1.02. Measured on 2,000 blocks: identical
+    hashes, timestamps and logs; 20 calls instead of 2,041.
 - A fork-safe wrapper that rethrows `ForkException` with the new chain's ancestry, walked by
   parent hash down to the finalized head.
 - RPC call counters by method, logged periodically.

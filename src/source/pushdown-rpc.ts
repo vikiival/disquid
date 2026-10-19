@@ -148,6 +148,81 @@ export class PushdownRpc extends Rpc {
         return withLogs ? this.attachLogs(chain) : chain
     }
 
+    /**
+     * Blocks `from..to` built from one filtered `eth_getLogs` pass, for finalized ranges only:
+     * number, hash and timestamp come from the logs (`blockHash`, `blockTimestamp`). A header is
+     * fetched only for a block the logs cannot describe: one without a matching log (the bloom
+     * check then catches a node that answers an unknown range with nothing), one whose logs lack
+     * `blockTimestamp`, or one whose logs disagree on the hash. `parentHash` of a block built from
+     * logs is left empty for the caller to link; finalized blocks are not checked for forks.
+     */
+    async getLogsOnlyBlocks(from: number, to: number): Promise<Block[]> {
+        let logs = await this.getLogsRange(from, to)
+        let found = new Map<number, {hash: string; timestamp?: string; logs: Log[]; bad: boolean}>()
+        for (let log of logs) {
+            let number = qty2Int(log.blockNumber)
+            if (number < from || number > to) {
+                this.logger.warn({fromBlock: from, toBlock: to, logBlock: log.blockNumber}, 'eth_getLogs returned a log outside the requested range')
+                continue
+            }
+            let timestamp: string | undefined = (log as any).blockTimestamp ?? undefined
+            let entry = found.get(number)
+            if (entry == null) {
+                entry = {hash: log.blockHash, timestamp, logs: [], bad: false}
+                found.set(number, entry)
+            }
+            if (timestamp == null) entry.timestamp = undefined
+            if (log.removed || log.blockHash !== entry.hash) entry.bad = true
+            else entry.logs.push(log)
+        }
+
+        let needHeader: number[] = []
+        for (let n = from; n <= to; n++) {
+            let entry = found.get(n)
+            if (entry == null || entry.bad || entry.timestamp == null) needHeader.push(n)
+        }
+        let headers = await this.getHeaders(needHeader)
+
+        let chain: Block[] = []
+        for (let n = from; n <= to; n++) {
+            let entry = found.get(n)
+            let header = headers.get(n)
+            if (header == null) {
+                chain.push(fromLogs(n, entry!.hash, entry!.timestamp!, sortUnique(entry!.logs)))
+                continue
+            }
+            let own = entry == null ? [] : !entry.bad && entry.hash === header.hash ? entry.logs : undefined
+            if (own == null || !this.bloomAgrees(header, own)) own = await this.resolveBlockLogs(header)
+            if (own == null) throw new Error(`inconsistent logs for finalized block ${n}#${header.hash}`)
+            header.logs = sortUnique(own)
+            chain.push(header)
+        }
+        return chain
+    }
+
+    /** Header-only blocks by number; contiguous runs share one batch call. */
+    private async getHeaders(numbers: number[]): Promise<Map<number, Block>> {
+        let result = new Map<number, Block>()
+        let runs: number[][] = []
+        for (let n of numbers) {
+            let run = runs[runs.length - 1]
+            if (run != null && run[run.length - 1] == n - 1) run.push(n)
+            else runs.push([n])
+        }
+        for (let run of runs) {
+            // super: the plain by-number header fetch, which stops at a missing or unlinked block.
+            let chain = await super.getBlockBatch(run)
+            if (chain.length < run.length) {
+                throw new Error(`node returned no header for block ${run[chain.length]}`)
+            }
+            for (let block of chain) {
+                block.block.transactions = []
+                result.set(block.number, block)
+            }
+        }
+        return result
+    }
+
     /** Answers a by-number header fetch from the header the last `latest` poll returned. */
     batchCall<T = any>(batch: {method: string; params?: any[]}[], options?: CallOptions<T>): Promise<T[]> {
         let header = this.headHeader
@@ -353,6 +428,12 @@ function mayContain(bloom: string, topic0?: string[], address?: string[]): boole
     if (topic0 && !topic0.some((t) => isBloomSuperset(bloom, t))) return false
     if (address && !address.some((a) => isBloomSuperset(bloom, a))) return false
     return true
+}
+
+// Only what the stream reads: mapRpcBlock parses `size`, the other header fields are optional.
+function fromLogs(number: number, hash: string, timestamp: string, logs: Log[]): Block {
+    let block = {number: toQty(number), hash, parentHash: '', timestamp, size: '0x0', transactions: []}
+    return {number, hash, block: block as unknown as GetBlock, logs}
 }
 
 function sortUnique(logs: Log[]): Log[] {

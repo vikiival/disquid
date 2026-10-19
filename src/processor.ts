@@ -14,7 +14,8 @@ function intFromEnv(name: string, fallback: number): number {
 }
 
 // DiscoveryRpcSourceBuilder is EvmRpcDataSourceBuilder plus header-only blocks, topic-filtered
-// eth_getLogs, retries/timeouts, slot-aware head polling and a reorg fix (see src/source).
+// eth_getLogs, header-less finalized catch-up, retries/timeouts, slot-aware head polling and a
+// reorg fix (see src/source).
 export const source = new DiscoveryRpcSourceBuilder()
     .setRpc({
         url: assertNotNull(process.env.RPC_URL, 'RPC_URL is required'),
@@ -24,7 +25,7 @@ export const source = new DiscoveryRpcSourceBuilder()
         maxBatchCallSize: intFromEnv('RPC_MAX_BATCH_CALL_SIZE', 50),
         strideSize: intFromEnv('RPC_STRIDE_SIZE', 50),
         strideConcurrency: intFromEnv('RPC_STRIDE_CONCURRENCY', 4),
-        maxLogsRange: intFromEnv('RPC_MAX_LOGS_RANGE', 50),
+        maxLogsRange: intFromEnv('RPC_MAX_LOGS_RANGE', 100),
         headPollInterval: intFromEnv('RPC_HEAD_POLL_INTERVAL_MS', 2000),
     })
     .setFields({
