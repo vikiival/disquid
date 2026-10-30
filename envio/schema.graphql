@@ -1,0 +1,45 @@
+# Same entities, fields and ids as the squid's schema.graphql. Addresses are
+# lowercase 0x-hex.
+
+enum TokenStandard {
+  ERC20
+  ERC721
+  ERC1155
+}
+
+enum TokenMetadataStatus {
+  PENDING
+  FETCHED
+}
+
+# id = contract address
+type Token {
+  id: ID!
+  firstSeenBlock: Int!
+  name: String
+  symbol: String
+  decimals: Int
+  metadataStatus: TokenMetadataStatus! @index
+  accounts: [AccountToken!]! @derivedFrom(field: "token")
+}
+
+# id = `${account}:${token}:${standardCode}`, standardCode in 20 | 721 | 1155
+type AccountToken @index(fields: ["account", "standard", "token"]) {
+  id: ID!
+  account: String! @index
+  token: Token!
+  standard: TokenStandard!
+  firstSeenBlock: Int!
+  lastSeenBlock: Int!
+  sentCount: Int!
+  receivedCount: Int!
+}
+
+# id = `${contract}:${tokenId}`, tokenId in decimal
+type NftItem @index(fields: ["contract", "tokenId"]) {
+  id: ID!
+  contract: Token!
+  tokenId: BigInt!
+  owner: String! @index
+  lastTransferBlock: Int!
+}

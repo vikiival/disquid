@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+name: disquid-envio
+description: Ethereum token discovery (HyperIndex port of the disquid squid)
+disable_default_cross_chain: true
+# Addresses arrive lowercase, as in the squid's ids.
+address_format: lowercase
+contracts:
+  # Both standards emit Transfer with the same topic0. They differ only in the
+  # number of indexed params (3 topics for ERC-20, 4 for ERC-721), which is how
+  # the squid's two decoders tell them apart.
+  - name: ERC20
+    events:
+      - event: Transfer(address indexed from, address indexed to, uint256 value)
+  - name: ERC721
+    events:
+      - event: Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
+chains:
+  - id: 1
+    start_block: 26104555
+    end_block: ${ENVIO_END_BLOCK:-}
+    contracts:
+      # No address: wildcard, every contract on the chain.
+      - name: ERC20
+      - name: ERC721
